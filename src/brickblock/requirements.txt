@@ -1,0 +1,23 @@
+black==22.10.0
+python-dotenv==0.21.0
+# llama-index
+openai
+llama_index
+llama-index-core
+llama-index-readers-file
+llama-index-llms-openai
+llama-index-embeddings-huggingface
+langchain
+langchainhub
+langchain-community
+langchain-openai
+# faiss-cpu
+# streamlit
+plotly
+scipy
+python-multipart
+fastapi
+# uv
+httpx
+requests
+uvicorn
