@@ -6,6 +6,47 @@ from functools import wraps
 from pydantic import BaseModel
 
 class APIBuilder:
+    """
+    APIBuilder is a utility class designed to facilitate the dynamic creation and registration of endpoints in a FastAPI application.
+    It simplifies the process of defining API routes by automating the handling of request parameters, including query parameters,
+    JSON request bodies, and file uploads. The class also supports both synchronous and asynchronous endpoint functions, seamlessly integrating
+    them into the FastAPI routing system.
+
+    Attributes:
+        router (APIRouter): An instance of FastAPI's APIRouter that holds the dynamically created API routes.
+
+    Methods:
+        init() -> APIBuilder:
+            Static method to initialize and return a new instance of APIBuilder with a fresh APIRouter instance.
+
+        is_pydantic_model(param_type: Any) -> bool:
+            Checks if the given parameter type is a subclass of Pydantic's BaseModel, indicating that it is a Pydantic model.
+            This method is used internally to determine the appropriate handling of request parameters based on their type.
+
+        create_endpoint_function(func: Callable, param_details: dict) -> Callable:
+            Creates a wrapper function around a user-defined function 'func', dynamically handling its parameters based on the provided
+            'param_details' dictionary. The wrapper function is designed to parse and validate request parameters, invoke the user-defined
+            function with these parameters, and handle the function's return value appropriately.
+
+        add_endpoint_to_router(list_func: List[Callable]):
+            Takes a list of user-defined functions and dynamically creates endpoints for them, adding these endpoints to the APIBuilder's
+            APIRouter instance. This method determines the appropriate HTTP method(s) for each endpoint based on the types of parameters
+            the user-defined functions expect.
+
+        get_router() -> APIRouter:
+            Returns the APIRouter instance associated with this APIBuilder, containing all dynamically created API routes.
+
+        update_fastapi_app(app: FastAPI):
+            Includes the APIBuilder's APIRouter into the given FastAPI application instance 'app', effectively registering all dynamically
+            created API routes with the application.
+
+        ```
+    
+    Note:
+        The APIBuilder class abstracts away some of the repetitive aspects of defining FastAPI routes, particularly in scenarios where
+        the application requires dynamic route creation based on a set of predefined functions. It is especially useful in applications
+        that require flexible or programmatically generated API endpoints.
+    """
     
     def __init__(self):
         self.router:APIRouter = None
@@ -13,6 +54,8 @@ class APIBuilder:
     
     @staticmethod
     def init():
+        """Initializes a new APIBuilder instance."""
+
         __api = APIBuilder()
         __api.router = APIRouter()
         return __api
@@ -109,8 +152,12 @@ class APIBuilder:
         return self
     
     def get_router(self):
+        """Returns the APIRouter containing all registered endpoints."""
+
         return self.router
     
     def update_fastapi_app(self,app):
+        """Includes the APIBuilder's router in the FastAPI application."""
+
         app.include_router(self.router)
         return self
