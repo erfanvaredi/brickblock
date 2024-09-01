@@ -14,7 +14,7 @@ setup(
     include_package_data=True,
     install_requires=[
         # Add your dependencies here
-        # 'some_package>=1.0',
+        'pickle',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
