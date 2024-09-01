@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="bb-core",
-    version="0.1.0",
+    version="0.1.2",
     description="Core package for the brickblock library.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
@@ -14,7 +14,7 @@ setup(
     include_package_data=True,
     install_requires=[
         # Add your dependencies here
-        'pickle',
+        # 'pickle',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
