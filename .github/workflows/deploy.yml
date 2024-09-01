@@ -1,13 +1,8 @@
-name: Deploy to PyPI
+name: Publish Python Package
 
 on:
   push:
     branches:
-      - main
-      - master
-  pull_request:
-    branches:
-      - main
       - master
 
 jobs:
@@ -15,34 +10,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
     - name: Set up Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: '3.x'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build
+        pip install setuptools wheel twine
 
-    - name: Build package
-      run: python -m build
-
-    - name: Publish package to PyPI
-      env:
-        PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+    - name: Build the package
       run: |
-        python -m pip install --upgrade twine
-        python -m twine upload dist/*
+        python setup.py sdist bdist_wheel
 
-    - name: Publish package to TestPyPI (optional)
-      if: github.ref == 'refs/heads/main'
+    - name: Publish to PyPI
       env:
-        TWINE_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        python -m twine upload --repository testpypi dist/*
+        twine upload dist/*
