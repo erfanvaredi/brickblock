@@ -5,7 +5,7 @@ import inspect
 import asyncio
 import uuid, pickle
 
-from utils.model_servializer import ModelSerializer
+from ..utils.model_servializer import ModelSerializer
 
 from function import Function
 
