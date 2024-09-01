@@ -1,14 +1,12 @@
 from fastapi import APIRouter, UploadFile
 from fastapi.responses import StreamingResponse
+from fastapi.routing import APIRoute
 import types
-from typing import Callable, List, Type, Any, Optional, Dict, Coroutine
+
+from typing import Callable, List, Type, Any, List,Optional
 import inspect
 from functools import wraps
 from pydantic import BaseModel
-
-from pipeline import Pipeline
-from workflow import Workflow
-from function import Function
 
 class APIBuilder:
     """
@@ -33,19 +31,10 @@ class APIBuilder:
             'param_details' dictionary. The wrapper function is designed to parse and validate request parameters, invoke the user-defined
             function with these parameters, and handle the function's return value appropriately.
 
-        add_endpoint_to_router(list_func: List[Callable], prefix: Optional[str] = None, tags: Optional[List[str]] = None, description: Optional[str] = None):
+        add_endpoint_to_router(list_func: List[Callable]):
             Takes a list of user-defined functions and dynamically creates endpoints for them, adding these endpoints to the APIBuilder's
             APIRouter instance. This method determines the appropriate HTTP method(s) for each endpoint based on the types of parameters
             the user-defined functions expect.
-
-        add_pipeline_to_router(pipeline, prefix: Optional[str] = None, tags: Optional[List[str]] = None, description: Optional[str] = None):
-            Adds a pipeline to the router with endpoints generated based on each function in the pipeline, including input/output schemas.
-
-        add_workflow_to_router(workflow, prefix: Optional[str] = None, tags: Optional[List[str]] = None, description: Optional[str] = None):
-            Adds a workflow to the router with endpoints generated based on each pipeline in the workflow, including input/output schemas.
-
-        __create_schema_endpoint(name: str, schema: dict):
-            Creates a schema endpoint that returns the provided schema as a JSON response.
 
         get_router() -> APIRouter:
             Returns the APIRouter instance associated with this APIBuilder, containing all dynamically created API routes.
@@ -53,14 +42,23 @@ class APIBuilder:
         update_fastapi_app(app: FastAPI):
             Includes the APIBuilder's APIRouter into the given FastAPI application instance 'app', effectively registering all dynamically
             created API routes with the application.
+
+        ```
+    
+    Note:
+        The APIBuilder class abstracts away some of the repetitive aspects of defining FastAPI routes, particularly in scenarios where
+        the application requires dynamic route creation based on a set of predefined functions. It is especially useful in applications
+        that require flexible or programmatically generated API endpoints.
     """
     
     def __init__(self):
-        self.router: APIRouter = None
+        self.router:APIRouter = None
+    
     
     @staticmethod
     def init():
         """Initializes a new APIBuilder instance."""
+
         __api = APIBuilder()
         __api.router = APIRouter()
         return __api
@@ -71,24 +69,67 @@ class APIBuilder:
         This function now safely handles cases where param_type might not be a class.
         """
         try:
+            # Check if param_type is a type and is a subclass of BaseModel
             return issubclass(param_type, BaseModel)
         except TypeError:
+            # If param_type is not a type (e.g., a typing.Generic), this will prevent the TypeError
             return False
+        
+    # def create_endpoint_function(self, func: Callable, param_details: dict):
+    #     """
+    #     Creates a wrapper function around the user-defined function 'func',
+    #     dynamically handling query, body, and file parameters.
+    #     """
+        
+    #     async def async_wrapper(*args, **kwargs):
+    #         if inspect.iscoroutinefunction(func):
+    #             return await func(*args, **kwargs)
+    #         else:
+    #             return func(*args, **kwargs)
+        
+    #     @wraps(func)
+    #     async def endpoint(*args, **kwargs):
+    #         # Prepare parameters (query, body, files) to pass to the actual function
+    #         call_params = {}
+    #         for name, value in kwargs.items():
+    #             if name in param_details:
+    #                 # param_type = param_details[name]
+    #                 param_type, param_source = param_details[name]
 
+    #                 if param_source == 'body':
+    #                     # Body parameters unpacked from kwargs
+    #                     call_params.update(value)
+    #                 if param_source == 'pydantic' and self.is_pydantic_model(param_type):
+    #                     # For Pydantic models, parse and validate the model from the body
+    #                     model = param_type.parse_obj(value)
+    #                     call_params[name] = model
+    #                 else:
+    #                     # Query and file parameters directly passed
+    #                     call_params[name] = value
+    #         __result =  await async_wrapper(*args, **call_params)
+            
+    #         # Automatically convert Pydantic models to dictionaries for serialization
+    #         if isinstance(__result, BaseModel):
+    #             return __result.model_dump()
+            
+    #         return __result
+
+    #     return endpoint
+    
     def create_endpoint_function(self, func: Callable, param_details: dict):
         """
         Extends the original method to support functions that return a streaming response.
         """
-        
         
         async def async_wrapper(*args, **kwargs):
             if inspect.iscoroutinefunction(func):
                 return await func(*args, **kwargs)
             else:
                 return func(*args, **kwargs)
-
+        
         @wraps(func)
         async def endpoint(*args, **kwargs):
+            # Existing setup code to prepare parameters
             call_params = {}
             for name, value in kwargs.items():
                 if name in param_details:
@@ -102,8 +143,10 @@ class APIBuilder:
                     else:
                         call_params[name] = value
             
+            # Invoke the function
             __result = await async_wrapper(*args, **call_params)
             
+            # Check if the result is a streaming type; if so, wrap it in a StreamingResponse
             if isinstance(__result, (types.GeneratorType, types.AsyncGeneratorType)):
                 return StreamingResponse(__result)
             elif isinstance(__result, BaseModel):
@@ -113,7 +156,46 @@ class APIBuilder:
 
         return endpoint
 
-    def add_endpoint_to_router(self, list_func: List[Function], prefix: Optional[str] = None, tags: Optional[List[str]] = None, description: Optional[str] = None):
+
+    # def add_endpoint_to_router(self, list_func: List[Callable]):
+    #     """
+    #     Dynamically creates an endpoint from a provided function (sync or async) that may include
+    #     query parameters, JSON request body, and file uploads, and adds it to the specified FastAPI router.
+    #     """
+    #     for func in list_func:
+    #         endpoint_path = f"/{func.__name__}"  # Endpoint path derived from the function name
+    #         param_details = {}
+
+    #         if_just_POST = False
+            
+    #         # Inspect function parameters to determine how to handle them (query, body, file)
+    #         sig = inspect.signature(func)
+    #         for name, param in sig.parameters.items():
+    #             if param.annotation == UploadFile or param.annotation == List[UploadFile]:
+    #                 param_details[name] = None, 'file'
+    #                 if_just_POST = True
+    #             elif param.annotation in [int, float, bool, str]:  # Simple types for query parameters
+    #                 param_details[name] = None, 'query'
+    #             elif self.is_pydantic_model(param.annotation):
+    #                 param_details[name] = (param.annotation, 'pydantic')
+    #                 if_just_POST = True
+    #             else:
+    #                 param_details[name] = None, 'body'
+    #                 if_just_POST = True
+
+    #         # Create a dynamic endpoint function
+    #         endpoint_func = self.create_endpoint_function(func, param_details)
+
+    #         # Determine methods based on parameter types
+    #         # methods = ["POST"] if 'file' in param_details.values() or 'body' in param_details.values() else ["GET", "POST"]
+    #         methods = ["POST"] if if_just_POST else ["GET", "POST"]
+            
+    #         # Add the dynamic endpoint to the router
+    #         self.router.add_api_route(endpoint_path, endpoint_func, methods=methods)
+        
+    #     return self
+
+    def add_endpoint_to_router(self, list_func: List[Callable], prefix: Optional[str] = None, tags: Optional[List[str]] = None, description: Optional[str] = None):
         """
         Dynamically creates an endpoint from a provided function (sync or async) that may include
         query parameters, JSON request body, and file uploads, and adds it to the specified FastAPI router.
@@ -124,16 +206,15 @@ class APIBuilder:
         - tags: Optional list of tags for categorizing the endpoints in the documentation.
         - description: Optional description for the endpoint, providing more details in the documentation.
         """
-        
-        list_func = [Function.as_Function(func) if isinstance(func, Callable) or isinstance(func, Coroutine) else func for func in list_func]
-        
         for func in list_func:
-            __func = func.to_afunction()
-            sig = inspect.signature(__func)
-            endpoint_path = f"/{prefix}/{func.name}" if prefix else f"/{func.name}"
+            # Prepend the prefix to the endpoint path, if provided
+            endpoint_path = f"/{prefix}/{func.__name__}" if prefix else f"/{func.__name__}" # Ensures no double slashes if prefix is empty
+            
             param_details = {}
             if_just_POST = False
             
+            # Inspect function parameters to determine how to handle them (query, body, file)
+            sig = inspect.signature(func)
             for name, param in sig.parameters.items():
                 if param.annotation == UploadFile or param.annotation == List[UploadFile]:
                     param_details[name] = None, 'file'
@@ -147,92 +228,30 @@ class APIBuilder:
                     param_details[name] = None, 'body'
                     if_just_POST = True
 
-            endpoint_func = self.create_endpoint_function(__func, param_details)
+            # Create a dynamic endpoint function
+            endpoint_func = self.create_endpoint_function(func, param_details)
 
+            # Determine methods based on parameter types
             methods = ["POST"] if if_just_POST else ["GET", "POST"]
             
+            # Add the dynamic endpoint to the router with optional tags and description
             self.router.add_api_route(
                 endpoint_path, 
                 endpoint_func, 
                 methods=methods, 
                 tags=tags, 
-                summary=description
+                summary=description  # 'summary' is used for short descriptions in FastAPI
             )
         
         return self
 
-    def add_pipeline_to_router(self, pipeline:Pipeline, prefix: Optional[str] = None, tags: Optional[List[str]] = None):
-        """
-        Adds a pipeline to the router with endpoints generated based on each function in the pipeline.
-        """
-        for func in pipeline.list_functions:
-            endpoint_name = f"{pipeline.name}_{func.name}"
-            description = f"Function `{func.name}` in the pipeline `{pipeline.name}`."
-            self.add_endpoint_to_router([func], prefix=prefix + '/functions', tags=['Internal Functions'], description=description)
-            
-            if not isinstance(func, Function):
-                func = Function.as_Function(func)
-                
-            print(func.__dict__)
-            
-            self.__create_schema_endpoint(f"schema/functions/{func.name}", {
-                "input_schema": func.input_model.schema(),
-                "output_schema": func.output_model.schema(),
-                "functions": [func.name],
-                "name": func.name,
-                "id": func.id,
-            },
-        tags=['Schema [Functions]'])
-            
-        self.add_endpoint_to_router([pipeline.to_afunction()], prefix=prefix, tags=tags)
-
-        # Add an endpoint to get the pipeline schema
-        self.__create_schema_endpoint(f"schema/pipelines/{pipeline.name}", {
-            "input_schema": pipeline.input_model.schema(),
-            "output_schema": pipeline.output_model.schema(),
-            "functions": [func.name for func in pipeline.list_functions],
-            "name": pipeline.name,
-            "id": pipeline.id,
-        },
-        tags=['Schema [Pipeline]'])
-
-        return self
-
-    def add_workflow_to_router(self, workflow:Workflow, prefix: Optional[str] = None, tags: Optional[List[str]] = None):
-        """
-        Adds a workflow to the router with endpoints generated based on each pipeline in the workflow.
-        """
-        for pipeline in workflow.workflow_pipelines:
-            self.add_pipeline_to_router(pipeline, prefix=prefix + '/pipelines', tags=['Workflow Internal Pipelines'])
-            
-        self.add_endpoint_to_router([workflow.to_afunction()], prefix=prefix, tags=tags)
-
-        # Add an endpoint to get the workflow schema
-        self.__create_schema_endpoint(f"schema/workflows/{workflow.name}", {
-            "input_schema": workflow.get_input_schema(),
-            "output_schema": workflow.get_output_schema(),
-            "pipelines": [pipeline.name for pipeline in workflow.workflow_pipelines],
-            "name": workflow.name,
-            "id": workflow.id,   
-        },
-        tags=['Schema [Workflow]'])
-
-        return self
-
-    def __create_schema_endpoint(self, name: str, schema: dict, methods=["GET"], tags=["Schema"]):
-        """
-        Creates a schema endpoint that returns the provided schema as a JSON response.
-        """
-        async def schema_endpoint():
-            return schema
-        
-        self.router.add_api_route(f"/{name}", schema_endpoint, methods=methods, tags=tags)
-
     def get_router(self):
         """Returns the APIRouter containing all registered endpoints."""
+
         return self.router
     
-    def update_fastapi_app(self, app):
+    def update_fastapi_app(self,app):
         """Includes the APIBuilder's router in the FastAPI application."""
+
         app.include_router(self.router)
         return self

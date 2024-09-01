@@ -21,3 +21,4 @@ fastapi
 httpx
 requests
 uvicorn
+dill
