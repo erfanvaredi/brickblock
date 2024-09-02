@@ -47,7 +47,9 @@ class Function:
         
         __input_model = Function.build_model(input_model_str)
         __output_model = Function.build_model(output_model_str)
-        __function = Function.build_function(function_code_str)
+        
+        __function_code_str = f'{input_model_str}\n\n{output_model_str}\n\n{function_code_str}'
+        __function = Function.build_function(__function_code_str)
         
         __instance = Function(__input_model, __output_model, __function)
         
