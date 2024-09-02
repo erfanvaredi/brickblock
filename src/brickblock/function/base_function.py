@@ -49,7 +49,11 @@ class Function:
         __output_model = Function.build_model(output_model_str)
         
         # __function_code_str = f'{input_model_str}\n\n{output_model_str}\n\n{function_code_str}'
-        __function = Function.build_function(function_code_str)
+        __function = Function.build_function(function_code_str, local_vars={
+            'InputModel': __input_model,
+            'OutputModel': __output_model
+        })
+        print(f'Function.str_to_Function __function: {__function}')
         
         __instance = Function(__input_model, __output_model, __function)
         
@@ -64,11 +68,10 @@ class Function:
         return local_vars[model_name]
     
     @staticmethod
-    def build_function(function_code_str: str) -> Callable:
+    def build_function(function_code_str: str, local_vars:dict={}) -> Callable:
         """Builds and returns a callable function from a string representation of function code."""
-        local_vars = {}
         exec(function_code_str, globals(), local_vars)
-        function_name = list(local_vars.keys())[0]
+        function_name = list(local_vars.keys())[-1]
         return local_vars[function_name]
 
     @staticmethod
@@ -216,23 +219,22 @@ class Function:
         Returns:
             Coroutine: The compiled asynchronous function ready to be used.
         """
-        input_model = self.input_model
-        output_model = self.output_model
-        function = self.function
 
-        async def async_wrapper(input_data: input_model) -> output_model:
+        async def async_wrapper(input_data: self.input_model) -> self.output_model:
             
             print(f'func function.to_afunction input_data: {input_data}')
-            print(f'func function.to_afunction input_model: {type(input_model)}')
+            print(f'func function.to_afunction input_model: {type(self.input_model)}')
             
-            __input_data = input_model(**input_data) if isinstance(input_data, dict) else input_model(**input_data.__dict__)
+            __input_data = self.input_model(**input_data) if isinstance(input_data, dict) else self.input_model(**input_data.__dict__)
             
             print(f'parsed input_data function.to_afunction __input_data: {__input_data}')
-            if inspect.iscoroutinefunction(function):
-                result = await function(__input_data)
+            print(f'parsed input_data function.to_afunction type(__input_data): {type(__input_data)}')
+            print(f'parsed input_data function > self.function : {self.function}')
+            if inspect.iscoroutinefunction(self.function):
+                result = await self.function(__input_data)
             else:
-                result = function(__input_data)
-            return output_model(**result) if isinstance(result, dict) else result
+                result = self.function(__input_data)
+            return self.output_model(**result) if isinstance(result, dict) else result
 
         return async_wrapper
 
