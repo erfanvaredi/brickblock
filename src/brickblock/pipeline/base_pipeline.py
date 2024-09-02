@@ -7,7 +7,7 @@ import uuid, pickle
 
 from ..utils.model_servializer import ModelSerializer
 
-from function import Function
+from ..function import Function
 
 class Pipeline:
     """
