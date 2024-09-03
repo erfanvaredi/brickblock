@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from ..pipeline import Pipeline
 from ..utils.model_servializer import ModelSerializer
 
-import dill, yaml, pickle
+import pickle
 import uuid
 
 class Workflow:
