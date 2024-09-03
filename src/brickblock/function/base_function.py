@@ -50,8 +50,8 @@ class Function:
         
         # __function_code_str = f'{input_model_str}\n\n{output_model_str}\n\n{function_code_str}'
         __function = Function.build_function(function_code_str, local_vars={
-            'InputModel': __input_model,
-            'OutputModel': __output_model
+            __input_model.__name__: __input_model,
+            __output_model.__name__: __output_model
         })
         print(f'Function.str_to_Function __function: {__function}')
         
