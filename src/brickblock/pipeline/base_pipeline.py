@@ -3,8 +3,8 @@ from pydantic import BaseModel
 import types
 import uuid, pickle
 
-from ..utils.model_servializer import ModelSerializer
-
+from ..utils.model_serializer import ModelSerializer
+import time
 from ..function import Function
 
 class Pipeline:
@@ -311,15 +311,20 @@ class Pipeline:
 
         async def _async_pipeline_function(input_data: self.input_model) -> self.output_model:
             data = input_data
+            
             for func in self.list_functions:
-                # if inspect.iscoroutinefunction(func):
+                # Record start time
+                start_time = time.perf_counter()
                 
-                print(f' data that is passing to  pipeline.to_afunction: {data}')
                 data = await func.to_afunction()(data)
-                # else:
-                #     # If the function is not async, run it in the event loop's default executor
-                #     loop = asyncio.get_event_loop()
-                #     data = await loop.run_in_executor(None, func.to_function(), data)
+                
+                # Record end time
+                end_time = time.perf_counter()
+                
+                # Calculate and print elapsed time per iteration
+                elapsed_time = end_time - start_time
+                print(f"Function [{func.name if func.label is '' else func.label}] completed in {elapsed_time:.2f} seconds")
+            
             return self.output_model(**data.model_dump()) if isinstance(data, BaseModel) else data
 
         
@@ -346,11 +351,17 @@ class Pipeline:
             dict: A dictionary with 'status', 'result', and 'message' keys indicating the success or failure 
                   of the pipeline execution, the resulting data, or the error message.
         """
-            
-        input_instance = self.input_model(**input_data) if isinstance(input_data, dict) else input_data
-        print(f' data that is passing to pipeline.arun: {input_instance}')
+
+        start_time = time.perf_counter()
+        
+        input_instance = self.input_model(**input_data) if isinstance(input_data, dict) else self.input_model.parse_obj(input_data.dict()) if isinstance(input_data,BaseModel) else input_data
+        # print(f' data that is passing to pipeline.arun: {input_instance}')
 
         output_instance = await self.to_afunction()(input_instance)
+        end_time = time.perf_counter()
+        elapsed_time = end_time-start_time
+        print(f"Pipeline [{self.name}] completed in {elapsed_time:.2f} seconds")
+        
         
         return output_instance
         # try:

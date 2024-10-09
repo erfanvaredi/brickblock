@@ -3,7 +3,7 @@ from pydantic import BaseModel, create_model, ValidationError
 import uuid, inspect
 import pickle
 
-from ..utils.model_servializer import ModelSerializer
+from ..utils.model_serializer import ModelSerializer
 
 class Function:
     """
@@ -23,7 +23,7 @@ class Function:
         as_Function(func: Callable) -> 'Function': Converts a given callable or coroutine into a Function instance.
     """
     
-    def __init__(self, input_model: Type[BaseModel], output_model: Type[BaseModel], func: Callable):
+    def __init__(self, input_model: Type[BaseModel], output_model: Type[BaseModel], func: Callable, label:str=''):
         """
         Initializes the Function with input and output Pydantic models and function code.
 
@@ -36,6 +36,7 @@ class Function:
         self.output_model = output_model
         self.function = func
         self.name = func.__name__
+        self.label = label
         self.id = str(uuid.uuid4())
 
         
@@ -51,7 +52,7 @@ class Function:
             __input_model.__name__: __input_model,
             __output_model.__name__: __output_model
         })
-        print(f'Function.str_to_Function __function: {__function}')
+        # print(f'Function.str_to_Function __function: {__function}')
         
         __instance = Function(__input_model, __output_model, __function)
         
@@ -115,7 +116,7 @@ class Function:
             else:
                 input_fields[name] = (Any, ...)
         
-        print(f'function._create_input_model input_fields: {input_fields}')
+        # print(f'function._create_input_model input_fields: {input_fields}')
         
         # Create and return the Pydantic model if no direct model was detected
         return create_model(model_name, **input_fields)
@@ -141,7 +142,7 @@ class Function:
         if return_type and hasattr(return_type, '__annotations__'):
             output_fields = {k: (v, ...) for k, v in return_type.__annotations__.items()}
             
-            print(f'function._create_output_model output_fields: {output_fields}')
+            # print(f'function._create_output_model output_fields: {output_fields}')
             
             return create_model(model_name, **output_fields)
         else:
@@ -220,14 +221,16 @@ class Function:
 
         async def async_wrapper(input_data: self.input_model) -> self.output_model:
             
-            print(f'func function.to_afunction input_data: {input_data}')
-            print(f'func function.to_afunction input_model: {type(self.input_model)}')
+            # print(f'func function.to_afunction input_data: {input_data}')
+            # print(f'func function.to_afunction input_model: {type(self.input_model)}')
             
-            __input_data = self.input_model(**input_data) if isinstance(input_data, dict) else self.input_model(**input_data.__dict__)
+            __input_data = self.input_model(**input_data) if isinstance(input_data, dict) \
+                else self.input_model.parse_obj(input_data.dict()) if isinstance(input_data,BaseModel)\
+                else self.input_model(**input_data.__dict__) \
             
-            print(f'parsed input_data function.to_afunction __input_data: {__input_data}')
-            print(f'parsed input_data function.to_afunction type(__input_data): {type(__input_data)}')
-            print(f'parsed input_data function > self.function : {self.function}')
+            # print(f'parsed input_data function.to_afunction __input_data: {__input_data}')
+            # print(f'parsed input_data function.to_afunction type(__input_data): {type(__input_data)}')
+            # print(f'parsed input_data function > self.function : {self.function}')
             if inspect.iscoroutinefunction(self.function):
                 result = await self.function(__input_data)
             else:
@@ -277,7 +280,10 @@ class Function:
             dict: The output data in dictionary form.
         """
         try:
-            input_instance = self.input_model(**input_data)
+            if isinstance(input_data, BaseModel):
+                input_instance = self.input_model.parse_obj(input_data.dict())
+            else:
+                input_instance = self.input_model.pars(**input_data)
             output_instance = await self.to_afunction()(input_instance)
             return {
                 'status': 'success',
