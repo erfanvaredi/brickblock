@@ -4,7 +4,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 from ..pipeline import Pipeline
-from ..utils.model_servializer import ModelSerializer
+from ..utils.model_serializer import ModelSerializer
 
 import pickle
 import uuid
