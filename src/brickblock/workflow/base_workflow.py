@@ -72,7 +72,6 @@ class Workflow:
                 input_fields[field_name] = (field_type, ...)
                 
 
-        print(f'input_fields: {input_fields}')
         WorkflowInputModel = create_model('WorkflowInputModel', **input_fields)
         return WorkflowInputModel
     
@@ -170,9 +169,6 @@ class Workflow:
         results = {}
         tasks = []
         
-        print(f'workflow.aun input_data: {input_data}')
-        
-        
         for pipeline in self.workflow_pipelines:
             tasks.append(self._process_pipeline_async(pipeline, input_data))
         
@@ -207,8 +203,6 @@ class Workflow:
         Returns:
             Coroutine: The compiled asynchronous function ready to be used.
         """
-        
-        print(f'workflow.to_afunction input_model: {self.input_model}')
         
         async def async_workflow_function(input_data: self.input_model) -> self.output_model:
             return await self.arun(input_data)

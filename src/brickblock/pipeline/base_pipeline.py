@@ -370,7 +370,6 @@ class Pipeline:
         
         for mod in self.list_functions:
             
-            print(f'{type(mod)=}')
             
             if issubclass(mod, BaseModule):
                 
@@ -379,7 +378,6 @@ class Pipeline:
                 start_time = time.perf_counter()
                 
                 __on_start_msg = await __module.onProgressStartMessage(data)
-                print(__on_start_msg)
                 yield f"data: {json.dumps({'message':str(__on_start_msg), 'status':'onProgressStartMessage','data':data.json() if isinstance(data, BaseModel) else str(data)})}\n\n"
                 data = await __module.run(data)
                 if isinstance(data, dict):
@@ -404,7 +402,6 @@ class Pipeline:
         
         for mod in self.list_functions:
             
-            print(f'{type(mod)=}')
             
             if issubclass(mod, BaseModule):
                 
