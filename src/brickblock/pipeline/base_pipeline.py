@@ -397,6 +397,33 @@ class Pipeline:
         # Send a final SSE event to indicate the stream is complete
         yield f"data: {json.dumps({'message':'', 'status':'End', 'data':None})}\n\n"
         
+    async def arun_modules(self, input_data) -> Coroutine:
+
+        
+        data = self.input_model(**input_data) if isinstance(input_data, dict) else self.input_model.parse_obj(input_data.dict()) if isinstance(input_data,BaseModel) else input_data
+        
+        for mod in self.list_functions:
+            
+            print(f'{type(mod)=}')
+            
+            if issubclass(mod, BaseModule):
+                
+                __module=mod()
+                
+                start_time = time.perf_counter()
+                
+                data = await __module.run(data)
+                if isinstance(data, dict):
+                    data = __module.run.__annotations__['return'](**data)
+                end_time = time.perf_counter()
+                elapsed_time = end_time - start_time
+                print(f"Function [{mod.__name__}] completed in {elapsed_time:.2f} seconds")
+            else:
+                raise Exception('The model should be type of BaseModule')
+
+        # Send a final SSE event to indicate the stream is complete
+        return data
+        
 
     def to_afunction(self) -> Coroutine:
         """Compiles the pipeline into an asynchronous callable function."""
@@ -443,6 +470,10 @@ class Pipeline:
             dict: A dictionary with 'status', 'result', and 'message' keys indicating the success or failure 
                   of the pipeline execution, the resulting data, or the error message.
         """
+
+        if self.sse:
+            return await self.arun_modules(input_data)
+
 
         start_time = time.perf_counter()
         
