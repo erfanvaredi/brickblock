@@ -1,11 +1,13 @@
-from typing import Callable, List, Type, get_type_hints, Union, Any, Coroutine
+from typing import Callable, List, Type, get_type_hints, Union, Any, Coroutine, AsyncGenerator
 from pydantic import BaseModel
 import types
 import uuid, pickle
+import json
 
 from ..utils.model_serializer import ModelSerializer
 import time
 from ..function import Function
+from ..abstract import BaseModule
 
 class Pipeline:
     """
@@ -45,17 +47,22 @@ class Pipeline:
         pass
 
     @staticmethod
-    def init(name:str, id:str=None):
+    def init(name:str, id:str=None, sse:bool=False) -> 'Pipeline':
         """Initializes a new Pipeline instance with a specified name."""
         
         __pipeline = Pipeline()
         __pipeline.name = name
         
         __pipeline.id = id if id else str(uuid.uuid4())
+        __pipeline.sse=sse
         
         __pipeline.input_model: Type[BaseModel] = None
         __pipeline.output_model: Type[BaseModel] = None
-        __pipeline.list_functions: List[Type[Function]] = []
+        if sse:
+            __pipeline.list_functions: List[BaseModule] = []
+        
+        else:
+            __pipeline.list_functions: List[Type[Function]] = []
         
         return __pipeline
 
@@ -92,6 +99,51 @@ class Pipeline:
             self.output_model = self.list_functions[-1].output_model
             
         return self
+    
+    # def modules(self, functions: List[BaseModule]):
+    #     """Registers a list of functions to the pipeline."""
+        
+    #     for f in functions:
+    #         if isinstance(f, BaseModule):
+    #             raise Exception('The module should be type of BaseModule')
+            
+    #         self.list_functions.append(f)
+
+    #     # self.list_functions = functions
+    #     if not self.input_model and self.list_functions:
+    #         # first_func = self.list_functions[0]
+    #         # first_func_sig = inspect.signature(first_func)
+    #         # first_param_type = list(first_func_sig.parameters.values())[0].annotation
+    #         self.input_model = Function.as_Function(self.list_functions[0]().run)
+
+    #     if not self.output_model and self.list_functions:
+    #         # Attempt to infer the output type from the last function
+    #         # last_func = self.list_functions[-1]
+    #         # last_func_sig = inspect.signature(last_func)
+    #         # self.output_model = last_func_sig.return_annotation
+    #         self.output_model = Function.as_Function(self.list_functions[-1]().run)
+            
+    #     return self
+
+    def modules(self, functions: List[BaseModule]):
+        """Registers a list of BaseModules to the pipeline."""
+        
+        for f in functions:
+            if not issubclass(f, BaseModule):
+                raise Exception('The module should be of type BaseModule')
+            
+            self.list_functions.append(f)
+
+        # Attempt to infer input and output model types from the BaseModule functions
+        if not self.input_model and self.list_functions:
+            self.input_model = self.list_functions[0].run.__annotations__['input']
+        
+        if not self.output_model and self.list_functions:
+            self.output_model = self.list_functions[-1].run.__annotations__['return']
+            
+        return self
+
+
 
     # def functions(self, functions: List[Callable]):
     #     """Registers a list of functions to the pipeline."""
@@ -305,6 +357,46 @@ class Pipeline:
         pipeline_function.__annotations__ = _pipeline_function.__annotations__
 
         return pipeline_function
+    
+    async def sse_generator(self, input_data) -> AsyncGenerator[str, None]:
+        """
+        Async generator to yield SSE events. It processes the pipeline and sends updates to the client.
+        """
+        if not self.sse:
+            # raise Exception('SSE is not activated')
+            yield f"data: {json.dumps({'message':'SSE is not activated in the pipeline', 'status':'Exception', 'data':None})}\n\n"
+        
+        data = self.input_model(**input_data) if isinstance(input_data, dict) else self.input_model.parse_obj(input_data.dict()) if isinstance(input_data,BaseModel) else input_data
+        
+        for mod in self.list_functions:
+            
+            print(f'{type(mod)=}')
+            
+            if issubclass(mod, BaseModule):
+                
+                __module=mod()
+                
+                start_time = time.perf_counter()
+                
+                __on_start_msg = await __module.onProgressStartMessage(data)
+                print(__on_start_msg)
+                yield f"data: {json.dumps({'message':str(__on_start_msg), 'status':'onProgressStartMessage','data':data.json() if isinstance(data, BaseModel) else str(data)})}\n\n"
+                data = await __module.run(data)
+                if isinstance(data, dict):
+                    data = __module.run.__annotations__['return'](**data)
+                yield f"data: {json.dumps({'message':'', 'status':'onFunctionCompleted', 'data':data.json() if isinstance(data, BaseModel) else str(data)})}\n\n"
+                __on_end_msg = await __module.onProgressEndMessage(data)
+                yield f"data: {json.dumps({'message':__on_end_msg, 'status':'onProgressEndMessage', 'data':data.json() if isinstance(data, BaseModel) else str(data)})}\n\n"
+                
+                end_time = time.perf_counter()
+                elapsed_time = end_time - start_time
+                print(f"Function [{mod.__name__}] completed in {elapsed_time:.2f} seconds")
+            else:
+                yield f"data: {json.dumps({'message':'Exception: The function type passed to the pipeline should be an instance of BaseModule', 'status':'Exception', 'data':data})}\n\n"
+
+        # Send a final SSE event to indicate the stream is complete
+        yield f"data: {json.dumps({'message':'', 'status':'End', 'data':None})}\n\n"
+        
 
     def to_afunction(self) -> Coroutine:
         """Compiles the pipeline into an asynchronous callable function."""
@@ -315,6 +407,7 @@ class Pipeline:
             for func in self.list_functions:
                 # Record start time
                 start_time = time.perf_counter()
+                        
                 
                 data = await func.to_afunction()(data)
                 
@@ -323,11 +416,10 @@ class Pipeline:
                 
                 # Calculate and print elapsed time per iteration
                 elapsed_time = end_time - start_time
-                print(f"Function [{func.name if func.label is '' else func.label}] completed in {elapsed_time:.2f} seconds")
+                print(f"Function [{func.name if func.label == '' else func.label}] completed in {elapsed_time:.2f} seconds")
             
             return self.output_model(**data.model_dump()) if isinstance(data, BaseModel) else data
 
-        
         # Dynamically create an async function with the specified pipeline name
         async_pipeline_function = types.FunctionType(
             _async_pipeline_function.__code__,
