@@ -378,7 +378,7 @@ class Pipeline:
         """
         if not self.sse:
             # raise Exception('SSE is not activated')
-            yield f"data: {json.dumps({'message':'SSE is not activated in the pipeline', 'status':'Exception', 'data':None})}\n\n"
+            yield f"{json.dumps({'message':'SSE is not activated in the pipeline', 'status':'Exception', 'data':None})}"
 
         data = (
             self.input_model(**input_data)
@@ -399,13 +399,13 @@ class Pipeline:
                 start_time = time.perf_counter()
 
                 __on_start_msg = await __module.onProgressStartMessage(data)
-                yield f"data: {json.dumps({'message':str(__on_start_msg), 'status':'onProgressStartMessage','data':data.json() if isinstance(data, BaseModel) else str(data)})}\n\n"
+                yield f"{json.dumps({'message':str(__on_start_msg), 'status':'onProgressStartMessage','data':data.json() if isinstance(data, BaseModel) else str(data)})}"
                 data = await __module.run(data)
                 if isinstance(data, dict):
                     data = __module.run.__annotations__["return"](**data)
-                yield f"data: {json.dumps({'message':'', 'status':'onFunctionCompleted', 'data':data.json() if isinstance(data, BaseModel) else str(data)})}\n\n"
+                yield f"{json.dumps({'message':'', 'status':'onFunctionCompleted', 'data':data.json() if isinstance(data, BaseModel) else str(data)})}"
                 __on_end_msg = await __module.onProgressEndMessage(data)
-                yield f"data: {json.dumps({'message':__on_end_msg, 'status':'onProgressEndMessage', 'data':data.json() if isinstance(data, BaseModel) else str(data)})}\n\n"
+                yield f"{json.dumps({'message':__on_end_msg, 'status':'onProgressEndMessage', 'data':data.json() if isinstance(data, BaseModel) else str(data)})}"
 
                 end_time = time.perf_counter()
                 elapsed_time = end_time - start_time
@@ -413,10 +413,10 @@ class Pipeline:
                     f"Function [{mod.__name__}] completed in {elapsed_time:.2f} seconds"
                 )
             else:
-                yield f"data: {json.dumps({'message':'Exception: The function type passed to the pipeline should be an instance of BaseModule', 'status':'Exception', 'data':data})}\n\n"
+                yield f"{json.dumps({'message':'Exception: The function type passed to the pipeline should be an instance of BaseModule', 'status':'Exception', 'data':data})}"
 
         # Send a final SSE event to indicate the stream is complete
-        yield f"data: {json.dumps({'message':'', 'status':'End', 'data':None})}\n\n"
+        yield f"{json.dumps({'message':'', 'status':'End', 'data':None})}"
 
     async def arun_modules(self, input_data) -> Coroutine:
 
