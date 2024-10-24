@@ -416,7 +416,7 @@ class Pipeline:
                 yield f"{json.dumps({'message':'Exception: The function type passed to the pipeline should be an instance of BaseModule', 'status':'Exception', 'data':data})}"
 
         # Send a final SSE event to indicate the stream is complete
-        yield f"{json.dumps({'message':'', 'status':'End', 'data':None})}"
+        yield f"{json.dumps({'message':'', 'status':'End', 'data':data})}"
 
     async def arun_modules(self, input_data) -> Coroutine:
 
