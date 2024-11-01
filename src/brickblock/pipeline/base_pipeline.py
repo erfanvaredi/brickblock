@@ -6,7 +6,7 @@ from typing import (
     Union,
     Any,
     Coroutine,
-    AsyncGenerator,
+    AsyncGenerator,AsyncIterator
 )
 from pydantic import BaseModel
 import types
@@ -395,17 +395,32 @@ class Pipeline:
             if issubclass(mod, BaseModule):
 
                 __module = mod()
+                
+                __function_return_type = __module.run.__annotations__["return"]
 
                 start_time = time.perf_counter()
 
                 __on_start_msg = await __module.onProgressStartMessage(data)
-                yield f"{json.dumps({'message':str(__on_start_msg), 'status':'onProgressStartMessage','data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
-                data = await __module.run(data)
+                
+                
+                yield f"{json.dumps({'message':str(__on_start_msg), 'status':'onProgressStartMessage', 'function_type':str(__function_return_type),'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                
+                if issubclass(__function_return_type, AsyncIterator):
+                    async for item in await __module.run(data):
+
+                        if 'passed_object' in item:
+                            data = item['passed_object']
+
+                        yield f"{json.dumps({'message':item['data'] if 'data' in item else '', 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':item.model_dump() if isinstance(item, BaseModel) else item if isinstance(item, dict) else str(item)})}"
+                
+                else:
+                    data = await __module.run(data)
+                    
                 if isinstance(data, dict):
                     data = __module.run.__annotations__["return"](**data)
-                yield f"{json.dumps({'message':'', 'status':'onFunctionCompleted', 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                yield f"{json.dumps({'message':'', 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
                 __on_end_msg = await __module.onProgressEndMessage(data)
-                yield f"{json.dumps({'message':__on_end_msg, 'status':'onProgressEndMessage', 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                yield f"{json.dumps({'message':__on_end_msg, 'status':'onProgressEndMessage', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
 
                 end_time = time.perf_counter()
                 elapsed_time = end_time - start_time
@@ -413,10 +428,10 @@ class Pipeline:
                     f"Function [{mod.__name__}] completed in {elapsed_time:.2f} seconds"
                 )
             else:
-                yield f"{json.dumps({'message':'Exception: The function type passed to the pipeline should be an instance of BaseModule', 'status':'Exception', 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                yield f"{json.dumps({'message':'Exception: The function type passed to the pipeline should be an instance of BaseModule', 'function_type':str(__function_return_type), 'status':'Exception', 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
 
         # Send a final SSE event to indicate the stream is complete
-        yield f"{json.dumps({'message':'', 'status':'End', 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+        yield f"{json.dumps({'message':'', 'status':'End', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
 
     async def arun_modules(self, input_data) -> Coroutine:
 
