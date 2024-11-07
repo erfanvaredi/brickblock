@@ -397,6 +397,7 @@ class Pipeline:
                 __module = mod()
                 
                 __function_return_type = __module.run.__annotations__["return"]
+                __function_input_type = __module.run.__annotations__["input"]
 
                 start_time = time.perf_counter()
 
@@ -406,6 +407,9 @@ class Pipeline:
                 yield f"{json.dumps({'message':str(__on_start_msg), 'status':'onProgressStartMessage', 'function_type':str(__function_return_type),'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
                 
                 if issubclass(__function_return_type, AsyncIterator):
+                    if isinstance(data, dict):
+                        print(f'data: {data}')
+                        data = __function_input_type(**data)
                     async for item in await __module.run(data):
 
                         if 'passed_object' in item:
@@ -414,10 +418,12 @@ class Pipeline:
                         yield f"{json.dumps({'message':item['data'] if 'data' in item else '', 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':item.model_dump() if isinstance(item, BaseModel) else item if isinstance(item, dict) else str(item)})}"
                 
                 else:
-                    data = await __module.run(data)
                     
-                if isinstance(data, dict):
-                    data = __module.run.__annotations__["return"](**data)
+                    data = await __module.run(__function_input_type(**data)) if isinstance(data, dict) else await __module.run(data)
+                    
+                    
+                # if isinstance(data, dict):
+                #     data = __module.run.__annotations__["return"](**data)
                 yield f"{json.dumps({'message':'', 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
                 __on_end_msg = await __module.onProgressEndMessage(data)
                 yield f"{json.dumps({'message':__on_end_msg, 'status':'onProgressEndMessage', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
