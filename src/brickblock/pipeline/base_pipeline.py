@@ -397,14 +397,16 @@ class Pipeline:
                 else input_data
             )
         )
+        
+        def get_name(module):
+            return module.name if hasattr(module, 'name') else module.__class__.__name__
 
         for mod in self.list_functions:
 
             if issubclass(mod, BaseModule):
 
                 __module = mod()
-                
-                __module_name = __module.name if hasattr(__module, 'name') else __module.__class__.__name__
+
                 
                 __function_return_type = __module.run.__annotations__["return"]
                 __function_input_type = __module.run.__annotations__["input"]
@@ -414,7 +416,7 @@ class Pipeline:
                 __on_start_msg = await __module.onProgressStartMessage(data)
                 
                 
-                yield f"{json.dumps({'message':str(__on_start_msg), 'name':__module_name,'status':'onProgressStartMessage', 'function_type':str(__function_return_type),'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                yield f"{json.dumps({'message':str(__on_start_msg), 'name':get_name(__module),'status':'onProgressStartMessage', 'function_type':str(__function_return_type),'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
                 
                 if issubclass(__function_return_type, AsyncIterator):
                     if isinstance(data, dict):
@@ -425,7 +427,7 @@ class Pipeline:
                         if 'passed_object' in item:
                             data = item['passed_object']
 
-                        yield f"{json.dumps({'message':item['data'] if 'data' in item else '', 'name':__module_name,'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':item.model_dump() if isinstance(item, BaseModel) else item if isinstance(item, dict) else str(item)})}"
+                        yield f"{json.dumps({'message':item['data'] if 'data' in item else '', 'name':get_name(__module),'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':item.model_dump() if isinstance(item, BaseModel) else item if isinstance(item, dict) else str(item)})}"
                 
                 else:
                     
@@ -434,9 +436,9 @@ class Pipeline:
                     
                 # if isinstance(data, dict):
                 #     data = __module.run.__annotations__["return"](**data)
-                yield f"{json.dumps({'message':'', 'name':__module_name, 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                yield f"{json.dumps({'message':'', 'name':get_name(__module), 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
                 __on_end_msg = await __module.onProgressEndMessage(data)
-                yield f"{json.dumps({'message':__on_end_msg, 'name':__module_name, 'status':'onProgressEndMessage', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                yield f"{json.dumps({'message':__on_end_msg, 'name':get_name(__module), 'status':'onProgressEndMessage', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
 
                 end_time = time.perf_counter()
                 elapsed_time = end_time - start_time
@@ -444,10 +446,10 @@ class Pipeline:
                     f"Function [{mod.__name__}] completed in {elapsed_time:.2f} seconds"
                 )
             else:
-                yield f"{json.dumps({'message':'Exception: The function type passed to the pipeline should be an instance of BaseModule', 'name':__module_name, 'function_type':str(__function_return_type), 'status':'Exception', 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                yield f"{json.dumps({'message':'Exception: The function type passed to the pipeline should be an instance of BaseModule', 'name':get_name(__module), 'function_type':str(__function_return_type), 'status':'Exception', 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
 
         # Send a final SSE event to indicate the stream is complete
-        yield f"{json.dumps({'message':'', 'name':__module_name, 'status':'End', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+        yield f"{json.dumps({'message':'', 'name':get_name(__module), 'status':'End', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
 
     async def arun_modules(self, input_data) -> Coroutine:
 
