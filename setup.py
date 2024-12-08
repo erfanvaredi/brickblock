@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="bb-core",
-    version="0.1.19",
+    version="0.1.20",
     description="Core package for the brickblock library.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
