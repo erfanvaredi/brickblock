@@ -379,6 +379,24 @@ class Pipeline:
         pipeline_function.__annotations__ = _pipeline_function.__annotations__
 
         return pipeline_function
+    
+    @staticmethod
+    def convert_to_dynamic_model(source_instance: BaseModel, target_model: BaseModel) -> BaseModel:
+        """
+        Converts a source Pydantic model instance to a target Pydantic model dynamically,
+        filling in any missing attributes with their defaults.
+        """
+        source_data = source_instance.model_dump()  # Extract source data
+        target_defaults = target_model.model_fields  # Access target model's fields and defaults
+
+        # Add missing attributes with default values from the target model
+        dynamic_data = {
+            key: target_defaults[key].default if key not in source_data else source_data[key]
+            for key in target_defaults
+        }
+
+        # Create an instance of the target model
+        return target_model(**dynamic_data)
 
     async def sse_generator(self, input_data) -> AsyncGenerator[str, None]:
         """
@@ -431,7 +449,22 @@ class Pipeline:
                 
                 else:
                     
-                    data = await __module.run(__function_input_type(**data)) if isinstance(data, dict) else await __module.run(data)
+                    if isinstance(data, BaseModel):
+                        
+                        
+                        # Convert data dynamically to the target function input type
+                        converted_data = Pipeline.convert_to_dynamic_model(
+                            source_instance=data,  # Convert dict to the expected input type
+                            target_model=__function_input_type             # Target model remains the same here
+                        )
+                        
+                    else:
+                        # Use the data directly if it's not a dict
+                        converted_data = __function_input_type(**data)
+
+                    # Run the module with the processed input
+                    data = await __module.run(converted_data)
+                    # data = await __module.run(__function_input_type(**data)) if isinstance(data, dict) else await __module.run(data)
                     
                     
                 # if isinstance(data, dict):
@@ -468,12 +501,32 @@ class Pipeline:
             if issubclass(mod, BaseModule):
 
                 __module = mod()
+                __function_return_type = __module.run.__annotations__["return"]
+                __function_input_type = __module.run.__annotations__["input"]
 
                 start_time = time.perf_counter()
 
-                data = await __module.run(data)
-                if isinstance(data, dict):
-                    data = __module.run.__annotations__["return"](**data)
+                # data = await __module.run(data)
+                # if isinstance(data, dict):
+                    # data = __module.run.__annotations__["return"](**data)
+                    
+                
+                if isinstance(data, BaseModel):
+                    
+                    # Convert data dynamically to the target function input type
+                    converted_data = Pipeline.convert_to_dynamic_model(
+                        source_instance=data,  # Convert dict to the expected input type
+                        target_model=__function_input_type             # Target model remains the same here
+                    )
+                        
+                else:
+                    # Use the data directly if it's not a dict
+                    converted_data = __function_input_type(**data)
+
+                # Run the module with the processed input
+                data = await __module.run(converted_data)
+                    
+                    
                 end_time = time.perf_counter()
                 elapsed_time = end_time - start_time
                 print(
