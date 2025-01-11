@@ -17,14 +17,23 @@ from ..utils.model_serializer import ModelSerializer
 import time
 from ..function import Function
 from ..abstract import BaseModule
+import base64
 
 
 from json import JSONEncoder
 from uuid import UUID
 JSONEncoder_olddefault = JSONEncoder.default
+
 def JSONEncoder_newdefault(self, o):
-    if isinstance(o, UUID): return str(o)
+    if isinstance(o, UUID): 
+        return str(o)
+    if isinstance(o, bytes):
+        try:
+            return o.decode("utf-8")
+        except UnicodeDecodeError:
+            return base64.b64encode(o).decode("utf-8")
     return JSONEncoder_olddefault(self, o)
+
 JSONEncoder.default = JSONEncoder_newdefault
 
 class Pipeline:
@@ -394,6 +403,8 @@ class Pipeline:
             key: target_defaults[key].default if key not in source_data else source_data[key]
             for key in target_defaults
         }
+
+        print(f'dynamic_data: {dynamic_data}')
 
         # Create an instance of the target model
         return target_model(**dynamic_data)
