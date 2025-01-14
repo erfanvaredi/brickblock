@@ -480,9 +480,14 @@ class Pipeline:
                     
                 # if isinstance(data, dict):
                 #     data = __module.run.__annotations__["return"](**data)
-                yield f"{json.dumps({'message':'', 'name':get_name(__module), 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                
+                __data_on_complete = data.model_dump() if isinstance(data, BaseModel) else str(data)
+                
+                __data_on_complete = __data_on_complete if not issubclass(__function_return_type, AsyncIterator) else {}
+                
+                yield f"{json.dumps({'message':'', 'name':get_name(__module), 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':__data_on_complete})}"
                 __on_end_msg = await __module.onProgressEndMessage(data)
-                yield f"{json.dumps({'message':__on_end_msg, 'name':get_name(__module), 'status':'onProgressEndMessage', 'function_type':str(__function_return_type), 'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                yield f"{json.dumps({'message':__on_end_msg, 'name':get_name(__module), 'status':'onProgressEndMessage', 'function_type':str(__function_return_type), 'data':__data_on_complete})}"
 
                 end_time = time.perf_counter()
                 elapsed_time = end_time - start_time
