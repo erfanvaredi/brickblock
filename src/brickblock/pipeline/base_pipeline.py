@@ -19,6 +19,7 @@ from ..function import Function
 from ..abstract import BaseModule
 import base64
 
+from copy import deepcopy
 
 from json import JSONEncoder
 from uuid import UUID
@@ -404,12 +405,12 @@ class Pipeline:
             for key in target_defaults
         }
 
-        print(f'dynamic_data: {dynamic_data}')
+        # print(f'dynamic_data: {dynamic_data}')
 
         # Create an instance of the target model
         return target_model(**dynamic_data)
 
-    async def sse_generator(self, input_data) -> AsyncGenerator[str, None]:
+    async def sse_generator(self, input_data, clean_sse_data_field_chunks:bool=False) -> AsyncGenerator[str, None]:
         """
         Async generator to yield SSE events. It processes the pipeline and sends updates to the client.
         """
@@ -444,19 +445,26 @@ class Pipeline:
 
                 __on_start_msg = await __module.onProgressStartMessage(data)
                 
+                __data_on_progress_start = {}
+                if not clean_sse_data_field_chunks:
+                    __data_on_progress_start= data.model_dump() if isinstance(data, BaseModel) else str(data)            
                 
-                yield f"{json.dumps({'message':str(__on_start_msg), 'name':get_name(__module),'status':'onProgressStartMessage', 'function_type':str(__function_return_type),'data':data.model_dump() if isinstance(data, BaseModel) else str(data)})}"
+                yield f"{json.dumps({'message':str(__on_start_msg), 'name':get_name(__module),'status':'onProgressStartMessage', 'function_type':str(__function_return_type),'data':__data_on_progress_start})}"
                 
                 if issubclass(__function_return_type, AsyncIterator):
                     if isinstance(data, dict):
-                        print(f'data: {data}')
+                        # print(f'data: {data}')
                         data = __function_input_type(**data)
                     async for item in await __module.run(data):
 
                         if 'passed_object' in item:
                             data = item['passed_object']
+                            
+                        __on_complete_async_data = {}
+                        if not clean_sse_data_field_chunks:
+                            __on_complete_async_data = data.model_dump() if isinstance(data, BaseModel) else str(data)
 
-                        yield f"{json.dumps({'message':item['data'] if 'data' in item else '', 'name':get_name(__module),'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':item.model_dump() if isinstance(item, BaseModel) else item if isinstance(item, dict) else str(item)})}"
+                        yield f"{json.dumps({'message':item['data'] if 'data' in item else '', 'name':get_name(__module),'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':__on_complete_async_data})}"
                 
                 else:
                     
@@ -482,12 +490,20 @@ class Pipeline:
                 #     data = __module.run.__annotations__["return"](**data)
                 
                 __data_on_complete = data.model_dump() if isinstance(data, BaseModel) else str(data)
+
+                if clean_sse_data_field_chunks:
+                    __data_on_complete = __data_on_complete if not issubclass(__function_return_type, AsyncIterator) else {}
                 
-                __data_on_complete = __data_on_complete if not issubclass(__function_return_type, AsyncIterator) else {}
                 
                 yield f"{json.dumps({'message':'', 'name':get_name(__module), 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':__data_on_complete})}"
+                
                 __on_end_msg = await __module.onProgressEndMessage(data)
-                yield f"{json.dumps({'message':__on_end_msg, 'name':get_name(__module), 'status':'onProgressEndMessage', 'function_type':str(__function_return_type), 'data':__data_on_complete})}"
+                
+                __data_on_progress_end = {}
+                if not clean_sse_data_field_chunks:
+                    __data_on_progress_end = deepcopy(__data_on_complete)
+                
+                yield f"{json.dumps({'message':__on_end_msg, 'name':get_name(__module), 'status':'onProgressEndMessage', 'function_type':str(__function_return_type), 'data':__data_on_progress_end})}"
 
                 end_time = time.perf_counter()
                 elapsed_time = end_time - start_time
