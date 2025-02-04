@@ -464,7 +464,7 @@ class Pipeline:
                         if not clean_sse_data_field_chunks:
                             __on_complete_async_data = data.model_dump() if isinstance(data, BaseModel) else str(data)
 
-                        yield f"{json.dumps({'message':item['data'] if 'data' in item else '', 'name':get_name(__module),'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':__on_complete_async_data})}"
+                        yield f"{json.dumps({'message':item['data'] if 'data' in item else item if isinstance(item,str) else '', 'name':get_name(__module),'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':__on_complete_async_data})}"
                 
                 else:
                     
