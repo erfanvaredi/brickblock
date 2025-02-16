@@ -457,17 +457,19 @@ class Pipeline:
                         data = __function_input_type(**data)
                     async for item in await __module.run(data):
 
-                        if 'passed_object' in item:
-                            data = item['passed_object']
-                            
-                        elif 'data' in item:
-                            data = item['data']
+                        __dict_item = item.model_dump() if isinstance(item, BaseModel) else item
+
+                        if 'passed_object' in __dict_item:
+                            data = __dict_item['passed_object']
+                        else:
+                            data = __dict_item
                             
                         __on_complete_async_data = {}
                         if not clean_sse_data_field_chunks:
                             __on_complete_async_data = data.model_dump() if isinstance(data, BaseModel) else str(data)
 
-                        yield f"{json.dumps({'message':item.get('data','') if isinstance(item,dict) else item if isinstance(item,str) else '', 'name':get_name(__module),'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':__on_complete_async_data})}"
+                        yield f"{json.dumps({'message':__dict_item.get('data','') if isinstance(__dict_item,dict) else __dict_item if isinstance(__dict_item,str) else '', 'name':get_name(__module),'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':__on_complete_async_data})}"
+                
                 
                 else:
                     
