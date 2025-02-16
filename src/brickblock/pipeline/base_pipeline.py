@@ -460,6 +460,9 @@ class Pipeline:
                         if 'passed_object' in item:
                             data = item['passed_object']
                             
+                        elif 'data' in item:
+                            data = item['data']
+                            
                         __on_complete_async_data = {}
                         if not clean_sse_data_field_chunks:
                             __on_complete_async_data = data.model_dump() if isinstance(data, BaseModel) else str(data)
