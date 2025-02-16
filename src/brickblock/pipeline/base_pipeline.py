@@ -446,8 +446,8 @@ class Pipeline:
                 __on_start_msg = await __module.onProgressStartMessage(data)
                 
                 __data_on_progress_start = {}
-                if not clean_sse_data_field_chunks:
-                    __data_on_progress_start= data.model_dump() if isinstance(data, BaseModel) else str(data)            
+                # if not clean_sse_data_field_chunks:
+                    # __data_on_progress_start= data.model_dump() if isinstance(data, BaseModel) else str(data)            
                 
                 yield f"{json.dumps({'message':str(__on_start_msg), 'name':get_name(__module),'status':'onProgressStartMessage', 'function_type':str(__function_return_type),'data':__data_on_progress_start})}"
                 
@@ -511,8 +511,8 @@ class Pipeline:
                 __on_end_msg = await __module.onProgressEndMessage(data)
                 
                 __data_on_progress_end = {}
-                if not clean_sse_data_field_chunks:
-                    __data_on_progress_end = deepcopy(__data_on_complete)
+                # if not clean_sse_data_field_chunks:
+                    # __data_on_progress_end = deepcopy(__data_on_complete)
                 
                 yield f"{json.dumps({'message':__on_end_msg, 'name':get_name(__module), 'status':'onProgressEndMessage', 'function_type':str(__function_return_type), 'data':__data_on_progress_end})}"
 
