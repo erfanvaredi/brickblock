@@ -461,7 +461,7 @@ class Pipeline:
                             data = item['passed_object']
                             
                         elif 'data' in item:
-                            data = item['passed_object']
+                            data = item['data']
                             
                         __on_complete_async_data = {}
                         if not clean_sse_data_field_chunks:
