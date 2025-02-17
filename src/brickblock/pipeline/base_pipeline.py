@@ -457,7 +457,7 @@ class Pipeline:
                         data = __function_input_type(**data)
                     async for item in await __module.run(data):
 
-                        __dict_item = item.model_dump() if isinstance(item, BaseModel) else item
+                        __dict_item = item.model_dump() if isinstance(item, BaseModel) else item if isinstance(item,dict) else item
 
                         if 'passed_object' in __dict_item:
                             data = __dict_item['passed_object']
@@ -467,10 +467,10 @@ class Pipeline:
                             
                         __on_complete_async_data = {}
                         if not clean_sse_data_field_chunks:
-                            try:
-                                __on_complete_async_data = self.type_adapter.dump_python(__data)
-                            except Exception:
-                                __on_complete_async_data = __data.model_dump() if isinstance(__data, BaseModel) else str(__data)
+                            # try:
+                            #     __on_complete_async_data = self.type_adapter.dump_python(__data)
+                            # except Exception:
+                            __on_complete_async_data = __data.model_dump() if isinstance(__data, BaseModel) else __data if isinstance(__data,dict) else str(__data)
 
                         yield f"{json.dumps({'message':__dict_item.get('data','') if isinstance(__dict_item,dict) else __dict_item if isinstance(__dict_item,str) else '', 'name':get_name(__module),'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':__on_complete_async_data})}"
                         
@@ -500,14 +500,12 @@ class Pipeline:
                 # if isinstance(data, dict):
                 #     data = __module.run.__annotations__["return"](**data)
                 
-                try:
-                    __data_on_complete = self.type_adapter.dump_python(data)
-                except Exception:
-                    __data_on_complete = data.model_dump() if isinstance(data, BaseModel) else str(data)
-
-                if clean_sse_data_field_chunks:
-                    __data_on_complete = __data_on_complete if not issubclass(__function_return_type, AsyncIterator) else {}
-                
+                # try:
+                #     __data_on_complete = self.type_adapter.dump_python(data)
+                #     print(f'__data_on_complete.try: {__data_on_complete}')
+                # except Exception:
+                __data_on_complete = data.model_dump() if isinstance(data, BaseModel) else data if isinstance(data,dict) else str(data)
+                    # print(f'__data_on_complete.exep: {__data_on_complete}')
                 
                 yield f"{json.dumps({'message':'', 'name':get_name(__module), 'status':'onFunctionCompleted', 'function_type':str(__function_return_type), 'data':__data_on_complete})}"
                 
