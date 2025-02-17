@@ -461,6 +461,7 @@ class Pipeline:
 
                         if 'passed_object' in __dict_item:
                             data = __dict_item['passed_object']
+                            __data = __dict_item['passed_object']
                         else:
                             __data = __dict_item
                             
