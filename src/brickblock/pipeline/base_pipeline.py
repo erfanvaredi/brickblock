@@ -72,7 +72,7 @@ class Pipeline:
     """
 
     def __init__(self):
-        self.type_adapter = TypeAdapter(dict[str, Any])
+        self.type_adapter = TypeAdapter(dict[str, Any] | BaseModel | str)
 
     @staticmethod
     def init(name: str, id: str = None, sse: bool = False) -> "Pipeline":
